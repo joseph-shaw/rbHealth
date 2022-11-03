@@ -1,0 +1,104 @@
+##################################################
+# SOURCE THIS FILE
+# source('Rep Analysis.R')
+##################################################
+
+library(jsonlite)
+library(httr)
+library(tidyverse)
+source('utils.R')
+
+##################################################
+# EDIT
+##################################################
+
+client_id <- readline(prompt = "Enter client id:")
+client_secret <- readline(prompt = "Enter client secret:")
+
+team_id <- "daea22a1-9e1b-4c73-9c0a-4948695b6431"
+
+date_from <- "2022-10-01" #YYYY-MM-DD
+
+date_to <- as.character(Sys.Date())
+
+##################################################
+# DO NOT EDIT BELOW
+##################################################
+
+main <-
+  function(client_id,
+           client_secret,
+           team_id,
+           date_from,
+           date_to) {
+    token <-
+      get_token(clientId = client_id, clientSecret = client_secret)
+
+    athletes <-
+      get_profiles(orgId = team_id,
+                   token = token,
+                   modifiedFrom = date_from) %>%
+      select(profileId, fullName)
+
+    tests <- get_tests(team_id, token, modifiedFrom = date_from) %>%
+      mutate(date = as.POSIXct(date))
+
+    raw_nb_traces <- get_nb_raw(token, ids = tests %>%
+                                  filter(
+                                    testType %in% c(
+                                      "ISO 30",
+                                      "ISO 30°",
+                                      "ISO 60",
+                                      "ISO 60°",
+                                      "ISO Prone",
+                                      "Nordic",
+                                      "Razor"
+                                    )
+                                  ))
+    raw_ff_traces <- get_ff_raw(token, ids = tests %>%
+                                  filter(
+                                    !testType %in% c(
+                                      "ISO 30",
+                                      "ISO 30°",
+                                      "ISO 60",
+                                      "ISO 60°",
+                                      "ISO Prone",
+                                      "Nordic",
+                                      "Razor"
+                                    )
+                                  ))
+
+    test_profiles <- tests %>%
+      merge(athletes, by = 'profileId')
+
+    dir.create('Outputs', showWarnings = FALSE)
+
+    for (i in 1:length(raw_nb_traces)) {
+      full_data <-
+        raw_nb_traces[[i]] %>%
+        merge(test_profiles, by = 'testId', all.x = TRUE)
+
+      details <-
+        full_data %>%
+        select(testId, profileId, fullName, date, position, testType) %>%
+        distinct()
+
+      nb_analysis(full_data, details)
+
+    }
+
+    for (i in 1:length(raw_ff_traces)) {
+      full_data <- raw_ff_traces[[i]] %>%
+        merge(test_profiles, by = 'testId', all.x = TRUE)
+
+      details <-
+        full_data %>%
+        select(testId, profileId, fullName, date, position, testType) %>%
+        distinct()
+
+      ff_analysis(full_data, details)
+
+    }
+  }
+
+main(client_id, client_secret, team_id, date_from, date_to)

@@ -1,0 +1,478 @@
+library(jsonlite)
+library(httr)
+
+get_token <- function(clientId, clientSecret) {
+  secret <- base64_enc(paste(clientId, clientSecret, sep = ":"))
+
+  req <- POST(
+    "https://security.valdperformance.com/connect/token",
+    add_headers(
+      "Authorization" = paste("Basic", gsub("\n", "", secret)),
+      "Content-Type" = "application/x-www-form-urlencoded;charset=UTF-8"
+    ),
+    body = "grant_type=client_credentials"
+  )
+
+  if (http_error(req)) {
+    stop(paste0("Token request failed: ", req$status_code))
+  }
+
+  token <- paste("Bearer", content(req)$access_token)
+
+  return(token)
+
+}
+
+# Retrieves profile data for specified orgId string
+
+get_profiles <- function(orgId, token, modifiedFrom, maxPage = 20) {
+  page <- 1
+  profiles = data.frame()
+
+  while (page < maxPage) {
+    url <-
+      paste(
+        "https://dbapi.valdperformance.com/v2021q2/teams/",
+        orgId,
+        "/athletes?modifiedFrom=",
+        modifiedFrom,
+        "&page=",
+        page,
+        sep = ""
+      )
+
+    req <- GET(url, add_headers("Authorization" = token))
+
+    if (req$status_code == 200) {
+      print(paste("Success:", req$status_code, 'for', url))
+
+      json <- content(req, as = "text")
+
+      profile <-
+        as.data.frame(fromJSON(json)) %>% select(profileId = items.id, fullName = items.fullName)
+
+      page <- page + 1
+
+      profiles <- bind_rows(profiles, profile)
+
+      if (nrow(profile) < 50) {
+        break
+      }
+
+    } else if (req$status_code == 404) {
+      print(paste("Exception:", req$status_code, 'for', url))
+
+      names <-
+        c("orgId", "profileId", "fullName", "gender", "birthDate")
+
+      return(setNames(data.frame(matrix(
+        ncol = length(names), nrow = 0
+      )),
+      names))
+
+    } else {
+      stop(paste("Error:", req$status_code, 'for', url))
+
+    }
+
+  }
+
+  return(profiles)
+
+}
+
+# Retrieves test data for each orgId in list
+
+get_tests <- function(orgId, token, modifiedFrom, maxPage = 20) {
+  tests <- data.frame()
+
+  page <- 1
+
+  while (page < maxPage) {
+    url <-
+      paste(
+        "https://dbapi.valdperformance.com/v2021q2/teams/",
+        orgId,
+        "/tests?modifiedFrom=",
+        modifiedFrom,
+        "&page=",
+        page,
+        sep = ""
+      )
+
+    req <- GET(url, add_headers("Authorization" = token))
+
+    if (req$status_code == 200) {
+      print(paste("Success:", req$status_code, 'for', url))
+
+      json <- content(req, as = "text")
+
+      test <-
+        as.data.frame(fromJSON(json))
+      page <- page + 1
+
+      tests <- bind_rows(tests, test)
+
+      if (nrow(test) < 50) {
+        break
+      }
+
+    } else if (req$status_code == 404) {
+      print(paste("Exception:", req$status_code, 'for', url))
+
+      names <- c("orgId",
+                 "profileId",
+                 "testId",
+                 "testType",
+                 "date",
+                 "position")
+
+      return(setNames(data.frame(matrix(
+        ncol = length(names), nrow = 0
+      )),
+      names))
+
+    } else {
+      stop(paste("Error:", req$status_code, 'for', url))
+
+    }
+
+  }
+
+  return(
+    tests %>% select(
+      orgId = items.teamId,
+      testId = items.id,
+      profileId = items.athleteId,
+      date = items.startTime,
+      position = items.position,
+      testType = items.testType,
+    )
+  )
+
+}
+
+# Main function
+
+get_nb_raw <- function(token, ids) {
+  # Retrieves raw trace data for specified orgId and testId
+
+  if (nrow(ids) == 0) {
+    return()
+  }
+
+  get_raw <- function(id, token, filename) {
+    org_id <- id[['orgId']]
+    test_id <- id[['testId']]
+
+    url <-
+      paste(
+        "https://dbapi.valdperformance.com/v2021q2/teams/",
+        org_id,
+        "/tests/",
+        test_id,
+        "/nordbordtrace",
+        sep = ""
+      )
+
+    req <- GET(url, add_headers("Authorization" = token))
+
+    if (req$status_code == 200) {
+      print(paste("Success:", req$status_code, 'for', url))
+
+      json <- content(req, as = "text", encoding = "UTF-8")
+
+      return(
+        as.data.frame(fromJSON(json)) %>%
+          select(
+            seconds = forces.ticks,
+            left = forces.leftForce,
+            right = forces.rightForce
+          ) %>%
+          mutate(
+            seconds = seconds / 50,
+            system = 'NordBord',
+            teamId = org_id,
+            testId = test_id
+          )
+      )
+
+    } else if (req$status_code == 404) {
+      stop(paste("Exception:", req$status_code, 'for', url))
+
+    } else {
+      stop(paste("Error:", req$status_code, 'for', url))
+
+    }
+
+  }
+
+  ids <- split(ids, seq(nrow(ids)))
+
+  return(lapply(ids, get_raw, token, filename))
+
+}
+
+# Main function
+
+get_ff_raw <- function(token, ids) {
+  # Retrieves raw trace data for specified orgId and testId
+
+  if (nrow(ids) == 0) {
+    return()
+  }
+
+  get_raw <- function(id, token, filename) {
+    org_id <- id[['orgId']]
+    test_id <- id[['testId']]
+
+    url <-
+      paste(
+        "https://dbapi.valdperformance.com/v2021q2/teams/",
+        org_id,
+        "/tests/",
+        test_id,
+        "/forceframetrace",
+        sep = ""
+      )
+
+    req <- GET(url, add_headers("Authorization" = token))
+
+    if (req$status_code == 200) {
+      print(paste("Success:", req$status_code, 'for', url))
+
+      json <- content(req, as = "text", encoding = "UTF-8")
+
+      return(
+        as.data.frame(fromJSON(json)) %>%
+          select(
+            seconds = forces.ticks,
+            innerLeft = forces.innerLeftForce,
+            innerRight = forces.innerRightForce,
+            outerLeft = forces.outerLeftForce,
+            outerRight = forces.outerRightForce
+          ) %>%
+          mutate(
+            seconds = seconds / 50,
+            system = 'ForceFrame',
+            teamId = org_id,
+            testId = test_id
+          )
+      )
+
+    } else if (req$status_code == 404) {
+      stop(paste("Exception:", req$status_code, 'for', url))
+
+    } else {
+      stop(paste("Error:", req$status_code, 'for', url))
+
+    }
+
+  }
+
+  ids <- split(ids, seq(nrow(ids)))
+
+  return(lapply(ids, get_raw, token, filename))
+
+}
+
+# Trace analysis
+
+nb_analysis <- function(full_data, details) {
+  data <- full_data %>% select(seconds, left, right)
+
+  max_force <- max(abs(c(data$left, data$right)))
+
+  data1 <-
+    data %>% pivot_longer(
+      cols = c(left, right),
+      names_to = "limb",
+      values_to = "force"
+    )
+
+  if (max(data$left) >= 0.4 * max_force) {
+    left_summary <- rep_analysis(data1, input_limb = "left")
+  }
+
+  if (max(data$right) >= 0.4 * max_force) {
+    right_summary <- rep_analysis(data1, input_limb = "right")
+  }
+
+  final <-
+    plyr::join_all(mget(ls(pattern = "_summary")), by = "rep", type = "full")
+
+  if ("left" %in% colnames(final) & "right" %in% colnames(final)) {
+    final <-
+      final %>% mutate(asym = round(((right - left) / pmax(right, left)) * 100, digits = 1))
+
+  }
+
+  final <- cbind(details, final)
+
+  filename <-
+    paste(unique(details$fullName),
+          unique(details$testType),
+          unique(details$date),
+          sep = ", ")
+
+  filename <- gsub("/", " ", filename)
+
+  filename <-
+    serialNext(prefix = paste("Outputs/", filename, sep = ""))
+
+  write.csv(final, paste(filename, ".csv", sep = ""), row.names = F)
+
+  rm(list = setdiff(ls(), c(
+    "test_traces", "rep_analysis", "serialNext"
+  )))
+}
+
+ff_analysis <- function(full_data, details) {
+  data <-
+    full_data %>%
+    select(seconds,
+           innerLeft,
+           outerLeft,
+           innerRight,
+           outerRight)
+
+  data1 <-
+    data %>% pivot_longer(
+      cols = c(
+        innerLeft,
+        innerRight,
+        outerLeft,
+        outerRight
+      ),
+      names_to = "limb",
+      values_to = "force"
+    ) %>% mutate(force = abs(force))
+
+  max_force <- max(data1$force)
+
+  if (max(abs(data$innerLeft)) >= 0.4 * max_force) {
+    innerLeft_summary <- rep_analysis(data1 = data1, input_limb = "innerLeft")
+  }
+
+  if (max(abs(data$innerRight)) >= 0.4 * max_force) {
+    innerRight_summary <- rep_analysis(data1 = data1, input_limb = "innerRight")
+  }
+
+  if (max(abs(data$outerLeft)) >= 0.4 * max_force) {
+    outerLeft_summary <- rep_analysis(data1 = data1, input_limb = "outerLeft")
+  }
+
+  if (max(abs(data$outerRight)) >= 0.4 * max_force) {
+    outerRight_summary <- rep_analysis(data1 = data1, input_limb = "outerRight")
+  }
+
+  final <-
+    plyr::join_all(mget(ls(pattern = "_summary")), by = "rep", type = "full")
+
+  if ("innerLeftForce" %in% colnames(final) &
+      "innerRightForce" %in% colnames(final)) {
+    final <-
+      final %>% mutate(innerAsym = round(((innerRight - innerLeft) / pmax(innerRight, innerLeft)
+      ) * 100, digits = 1))
+
+  }
+
+  if ("outerLeftForce" %in% colnames(final) &
+      "outerRightForce" %in% colnames(final)) {
+    final <-
+      final %>% mutate(outerAsym = round(((outerRight - outerLeft) / pmax(outerRight, outerLeft)
+      ) * 100, digits = 1))
+
+  }
+
+  if ("innerLeft" %in% colnames(final) &
+      "outerLeft" %in% colnames(final)) {
+    final <-
+      final %>% mutate(
+        leftInnerOuterRatio = round(innerLeft / outerLeft, digits = 2),
+        leftOuterInnerRatio = round(outerLeft / innerLeft, digits = 2)
+      )
+
+  }
+
+  if ("innerRight" %in% colnames(final) &
+      "outerRight" %in% colnames(final)) {
+    final <-
+      final %>% mutate(
+        rightInnerOuterRatio = round(innerRight / outerRight, digits = 2),
+        rightOuterInnerRatio = round(outerRight / innerRight, digits = 2)
+      )
+
+  }
+
+  final <- cbind(details, final)
+
+  filename <-
+    paste(unique(details$fullName),
+          unique(details$testType),
+          unique(details$date),
+          sep = ", ")
+
+  filename <- gsub("/", " ", filename)
+
+  write.csv(final,
+            paste("Outputs/", filename, ".csv", sep = ""),
+            row.names = F)
+
+  rm(list = setdiff(ls(), c("test_traces", "rep_analysis")))
+}
+
+rep_analysis <- function(data1, input_limb) {
+  threshold <-
+    data1 %>%
+    filter(limb == input_limb) %>%
+    summarise(force = max(force) *
+                0.4) %>%
+    pull(force)
+
+  group <- function(x)
+    cumsum(c(1, diff(x) > 50))
+
+  filtered <-
+    data1 %>%
+    filter(limb == input_limb) %>%
+    mutate(tp = row_number()) %>%
+    filter(force >= threshold) %>%
+    mutate(rep = group(tp)) %>%
+    select(-tp)
+
+  summary <-
+    filtered %>% group_by(limb, rep) %>%
+    summarise(peak = max(force)) %>%
+    pivot_wider(
+      id_cols = c(rep),
+      names_from = limb,
+      values_from = peak
+    )
+
+  return(summary)
+
+}
+
+serialNext <- function(prefix) {
+  file1 <- paste(prefix, ".csv", sep = "")
+
+  if (!file.exists(file1)) {
+    return(prefix)
+  }
+
+  i <- 1
+
+  repeat {
+    f <- paste(prefix, "(", i, ")", sep = "")
+
+    file2 <- paste(f, ".csv", sep = "")
+
+    if (!file.exists(file2)) {
+      return(f)
+    }
+
+    i <- i + 1
+
+  }
+}
