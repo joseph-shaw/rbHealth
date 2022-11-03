@@ -12,6 +12,7 @@ LazyData: true
 RoxygenNote: 7.1.1
 Imports: 
     dplyr,
+    getPass,
     janitor,
     lubridate,
     magrittr,

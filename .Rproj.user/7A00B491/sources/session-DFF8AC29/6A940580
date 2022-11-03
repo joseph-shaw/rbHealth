@@ -3,7 +3,7 @@
     "path": "~/R/rbHealth/R/push_wattbike_to_sb.R",
     "project_path": "R/push_wattbike_to_sb.R",
     "type": "r_source",
-    "hash": "1546487823",
+    "hash": "22598908",
     "contents": "",
     "dirty": false,
     "created": 1667479583959.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "33,15",
+        "cursorPosition": "35,0",
         "scrollLine": "7"
     },
     "folds": "",
-    "lastKnownWriteTime": 1667479592,
+    "lastKnownWriteTime": 1667479707,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1667479592199,
+    "last_content_update": 1667479707631,
     "read_only": false,
     "read_only_alternatives": []
 }

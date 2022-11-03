@@ -27,6 +27,8 @@ push_appointments_to_sb <- function(
   library(dplyr)
   library(magrittr)
   library(tidyr)
+  library(getPass)
+
 
 # Pull user IDs -----------------------------------------------------------
 ids <-  neon::pull_smartabase(

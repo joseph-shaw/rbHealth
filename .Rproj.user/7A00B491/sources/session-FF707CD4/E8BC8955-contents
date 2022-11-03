@@ -32,6 +32,7 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
   library(janitor)
   library(lubridate)
   library(tidyr)
+  library(getPass)
 
   # Load files --------------------------------------------------------------
 
