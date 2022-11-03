@@ -15,6 +15,7 @@ Imports:
     janitor,
     lubridate,
     magrittr,
+    tidyr,
     XML
 Suggests: 
     neon
