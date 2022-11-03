@@ -30,4 +30,5 @@ Make sure your credentials have been added to your R environment on the
 \examples{
 
 push_appointments_to_smartabase(sb_user_id = 22803)
+
 }

@@ -17,6 +17,8 @@
 #'sb_user_id = 22803
 #')
 #'
+#'@export
+
 push_wattbike_to_sb <- function( start_folder = "C:/Users/shaw_/Royal Opera House/Ballet Healthcare (private) - Healthcare Shared/Profiling/wattbike_to_smartabase_pending", end_folder = "C:/Users/shaw_/Royal Opera House/Ballet Healthcare (private) - Healthcare Shared/Profiling/2022 RB Profiling/Raw Bike Data", test_duration_secs = 180, sb_user_id
 ){
 
