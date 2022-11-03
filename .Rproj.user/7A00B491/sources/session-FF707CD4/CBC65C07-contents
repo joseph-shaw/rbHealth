@@ -1,0 +1,5 @@
+usethis::use_package("dplyr")
+usethis::use_package("neon", type = "suggests")
+usethis::use_package("XML")
+usethis::use_package("janitor")
+usethis::use_package("lubridate")
