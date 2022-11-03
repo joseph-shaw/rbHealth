@@ -5,10 +5,9 @@
 \title{Pull wattbike time trial data from the shared drive and push to Smartabase}
 \usage{
 push_wattbike_to_sb(
- 
-    start_folder = "C:/Users/shaw_/Royal Opera House/Ballet Healthcare (private) - Healthcare Shared/Profiling/wattbike_to_smartabase_pending",
- 
-    end_folder = "C:/Users/shaw_/Royal Opera House/Ballet Healthcare (private) - Healthcare Shared/Profiling/2022 RB Profiling/Raw Bike Data",
+  user = Sys.info()[["user"]],
+  start_folder = NA,
+  end_folder = NA,
   test_duration_secs = 180,
   sb_user_id
 )
@@ -27,17 +26,4 @@ Pushes data to Smartabase.
 }
 \description{
 Pull wattbike time trial data from the shared drive and push to Smartabase
-}
-\examples{
-# Use default file paths
-push_wattbike_to_sb(test_duration_secs = 180, sb_user_id = 22803)
-
-# Specify file path
-push_wattbike_to_sb(
-start_folder = "C:/Users/shaw_/Royal Opera House/Ballet Healthcare (private) - Healthcare Shared/Profiling/wattbike_to_smartabase_pending",
-end_folder = "C:/Users/shaw_/Royal Opera House/Ballet Healthcare (private) - Healthcare Shared/Profiling/2022 RB Profiling/Raw Bike Data",
-test_duration_secs = 180,
-sb_user_id = 22803
-)
-
 }
