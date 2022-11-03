@@ -23,8 +23,9 @@ push_appointments_to_sb <- function(
 ){
 
 # Load packages ----------------------------------------------------------
-library(neon)
-library(tidyverse)
+  library(neon)
+  library(dplyr)
+  library(magrittr)
 
 # Pull user IDs -----------------------------------------------------------
 ids <-  neon::pull_smartabase(

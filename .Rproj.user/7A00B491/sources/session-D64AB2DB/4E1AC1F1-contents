@@ -25,7 +25,8 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
 
   # Load Packages -----------------------------------------------------------
 
-  library(tidyverse)
+  library(dplyr)
+  library(magrittr)
   library(neon)
   library(XML)
   library(janitor)
