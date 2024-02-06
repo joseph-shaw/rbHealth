@@ -1,0 +1,25 @@
+
+
+
+
+df <- readxl::read_xlsx("C:/Users/joseph.shaw/Royal Opera House/Ballet Healthcare (private) - Healthcare Shared/Research/Research Projects/2023 - Trunk Strength Testing MSc - Johnny Bucke/raw_data.xlsx") %>% 
+  as.data.frame() %>% 
+  janitor::clean_names() %>% 
+  group_by(name, test_position, date) %>% 
+  summarise(
+    max = max(force_kg),
+    mean = mean(force_kg)
+  ) %>% 
+  group_by(test_position) %>% 
+  summarise(
+    max = mean(max),
+    mean = mean(mean)
+  )
+
+
+
+
+
+
+
+

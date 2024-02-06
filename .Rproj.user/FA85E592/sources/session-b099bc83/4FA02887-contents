@@ -1,0 +1,234 @@
+#' Process local file containing blood results and push to smartabase
+#'
+#' @param results.path string: path to the folder containing the results file to upload. No trailing slash.
+#' @param id.path string: path to the folder containing the id file to join. No trailing slash.
+#' @param female.path string: path to the folder containing the female info file to join. No trailing slash.
+#' @param reference.path string: path to the folder containing the reference ranges file to join. No trailing slash.
+#' @param sb_user_id numeric: uploader's Smartabase ID. Contact Smartabase administrator to obtain.
+#' @param date string: date on which bloods were taken. "yyyy-mm-dd"
+#' @returns Pushes data to Smartabase.
+#' @examples
+#' # Use default file paths
+#' push_wattbike_to_sb(test_duration_secs = 180, sb_user_id = 22803)
+#'
+#'# Specify file path
+#'push_wattbike_to_sb(
+#'user = Sys.info()[["user"]],
+#'start_folder = NA,
+#'end_folder = NA",
+#'test_duration_secs = 180,
+#'sb_user_id = 22803
+#')
+#'
+#'@export
+
+read_bloods <- function(id.path, results.path, female.path, reference.path, sb_user_id, date){
+
+  library(tidyverse)
+  library(neon)
+
+  # download personal details
+  personal.details <- neon::pull_smartabase(
+    form = "Personal Details",
+    start_date = "01/01/2010",
+    end_date = "01/01/2040"
+  ) %>%
+    janitor::clean_names() %>%
+    select(first_name, surname, date_of_birth, user_id) %>%
+    rename(last_name = surname) %>%
+    mutate(
+      last_name_lower = tolower(last_name)
+    ) %>%
+    select(-c(first_name, last_name))
+
+  # read ids
+  ids <- readxl::read_xlsx(id.path) %>%
+    janitor::clean_names() %>%
+    select(id:age) %>%
+    mutate(
+      last_name_lower = tolower(sb_surname)
+    ) %>%
+    left_join(personal.details, by = "last_name_lower") %>%
+    distinct()
+
+  # read and process data
+  data <- readxl::read_xlsx(results.path) %>%
+    janitor::clean_names()
+
+  print(names(data))
+  first_test <- readline(prompt="Enter name of first variable: ")
+  last_test <- readline(prompt="Enter name of last variable: ")
+
+  first_test <- which(names(data) == first_test)
+  last_test <- which(names(data) == last_test)
+
+
+  data <- data  %>%
+    select(reg_no, date_time_received, first_test:last_test) %>%
+    mutate(
+      across(!date_time_received, as.character)
+    ) %>%
+    filter(!is.na(reg_no)) %>%
+    pivot_longer(
+      !reg_no:date_time_received,
+      names_to = "test",
+      values_to = "result"
+    )
+
+  ref_ranges <- read_csv(reference.path) %>%
+    janitor::clean_names() %>%
+    fill(test:units, .direction = "down") %>%
+    mutate(
+      test = tolower(test),
+      test = gsub(" ", "_", test)
+    )
+
+  female <- read.csv(female.path) %>%
+    mutate(fh.name = tolower(About)) %>%
+    select(fh.name, Are.you.currently.using.any.form.of.contraception, On.which.day.did.your.current.menstrual.cycle.start., Day.of.Cycle)
+
+
+  test <- data %>%
+    mutate(
+      test = gsub("testosterone_ia", "testosterone", test)
+    ) %>%
+    left_join(ref_ranges, by = "test") %>%
+    left_join(ids, by = c("reg_no" = "id")) %>%
+    mutate(
+      sex = ifelse(sex == "M", "male", "female"),
+      comments = ifelse(is.na(comments), sex, comments),
+      fh.name = tolower(paste(first_name, sb_surname)),
+  ) %>%
+  filter(
+    !(comments == "male" & sex == "female"),
+    !(comments == "female" & sex == "male"),
+  ) %>%
+    left_join(female, by = "fh.name") %>%
+    janitor::clean_names() %>%
+    rename(
+      first_day_current_cycle = on_which_day_did_your_current_menstrual_cycle_start,
+      contraception = are_you_currently_using_any_form_of_contraception
+    ) %>%
+    mutate(
+      first_day_current_cycle = as.Date(first_day_current_cycle, format = "%d-%m-%Y"),
+      test_date = as.Date(date_time_received, format = "%Y-%m-%d"),
+      day_of_cycle = test_date - first_day_current_cycle
+    ) %>%
+    pivot_wider(
+      #c(lower_ref_limit, upper_ref_limit, phase),
+      names_from = phase,
+      values_from = c(lower_ref_limit, upper_ref_limit)
+    ) %>%
+    rename(
+      low = lower_ref_limit_NA,
+      high = upper_ref_limit_NA,
+      low_follicular = lower_ref_limit_follicular,
+      high_follicular = upper_ref_limit_follicular,
+      low_luteal = lower_ref_limit_luteal,
+      high_luteal = upper_ref_limit_luteal,
+      low_mid.cycle = `lower_ref_limit_mid-cycle`,
+      high_mid.cycle = `upper_ref_limit_mid-cycle`,
+    ) %>%
+    mutate(
+      result_numeric = tidyr::extract_numeric(result),
+      flag = case_when(
+        test == "adjusted_calcium" ~ NA,
+        is.na(low)~"phase-specific",
+        result_numeric <= low ~ "Low",
+        result_numeric >= high ~ "High",
+      ),
+      date_of_birth = as.Date(date_of_birth, format = "%d-%m-%Y"),
+      age = round(as.numeric((test_date - date_of_birth) / 365))
+    ) %>%
+    select(
+      first_name, last_name, user_id, sex, date_of_birth, age, contraception, test_date, first_day_current_cycle, day_of_cycle, test, result, units,
+      flag, low , low_follicular , low_luteal , low_mid.cycle , high , high_follicular , high_luteal , high_mid.cycle
+
+    )
+
+
+
+
+  units <- ref_ranges[ref_ranges$range == "Units",] %>%
+    select(3,4) %>%
+    distinct()
+
+  ref_ranges <- ref_ranges[ref_ranges$range != "Units",] %>%
+    pivot_wider(
+      names_from = range,
+      values_from = threshold
+    ) %>%
+    mutate(
+      sex = case_when(
+        sex == "Female"~ "F",
+        sex == "Male"~ "M"
+      )
+    ) %>%
+    janitor::clean_names()
+
+  phase <- readxl::read_xlsx(id.path) %>%
+    janitor::clean_names() %>%
+    select(id, x1st_day_menstral, day_of_cycle, contraception)
+
+  data <- data %>%
+    left_join(ids, by = c("reg_no" = "id")) %>%
+    left_join(ref_ranges, by = c("sex", "test")) %>%
+    left_join(phase, by = c("reg_no" = "id")) %>%
+    rename(id = reg_no) %>%
+    mutate(
+      sign = ifelse(grepl("<", result), "<", ""),
+      result = gsub("<", "", result),
+      result = as.numeric(result),
+      across(very_low:high, as.numeric),
+      flag = case_when(
+        result > high ~ "high",
+        result > low ~ "normal",
+        result > very_low ~ "low",
+        result < very_low ~ "very low"
+      ),
+      x1st_day_menstral = openxlsx::convertToDate(as.numeric(x1st_day_menstral), origin = "1900-01-01")
+    ) %>%
+    select(-c(id:surname)) %>%
+    relocate(first_name:age, .after = dtr) %>%
+    relocate(x1st_day_menstral:contraception, .after = age) %>%
+    relocate(sign, .before = result) %>%
+    select(-c(very_low:high))
+
+  flags <- data %>%
+    filter(!is.na(flag) & flag != "normal") %>%
+    arrange(last_name)
+
+  reds <- data %>%
+    filter(
+      test %in% c("fer", "free_t4", "lh", "testia", "fsh", "e2d")
+    )
+
+}
+
+data <- data %>%
+  left_join(units,by = "test") %>%
+  rename(units = threshold)
+
+write.csv(data, "bloods_2023-06-14.csv")
+
+
+xl <- data %>%
+  mutate(
+    result = paste(sign, result)
+  ) %>%
+  select(-sign) %>%
+  pivot_wider(
+    names_from = c("first_name", "last_name", sex:contraception ),
+    values_from = c(result, flag)
+  )
+
+write_csv(xl, "bloods_2023-06-14.csv")
+write_csv(flags, "bloodsflags_2023-06-14.csv")
+
+
+
+
+
+
+
+
