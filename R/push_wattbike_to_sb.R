@@ -60,14 +60,15 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
       date = as.Date(start_date, format = "%d/%m/%Y")
     ) %>%
     group_by(user_id) %>%
-    rename(weight = 3) %>%
+    rename(weight = `Weight (kg)`) %>%
     filter(
+      weight > 35,
       date == max(date),
       !is.na(weight)
     ) %>%
     slice(1) %>%
     select(
-      user_id, about, "Weight (kg)"
+      user_id, about, weight
     ) %>%
     mutate(
       about = tolower(about)
@@ -132,7 +133,7 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
     separate(firstname, into = c("firstname", "surname")) %>%
     left_join(weights, by = "about") %>%
     rename(
-      weight = 'Weight (kg)',
+      #weight = 'Weight (kg)',
       date_time = time,
     ) %>%
     mutate(
