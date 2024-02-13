@@ -82,7 +82,15 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
     nodes <- XML::getNodeSet(doc, "//ns:Trackpoint", "ns")
     rows <-  lapply(nodes, function(x) data.frame(XML::xmlToList(x)))
 
-    data <- do.call("rbind", rows) %>%
+    library(plyr)
+
+    #data <- do.call("rbind", rows) %>%
+    data <- do.call("rbind.fill", rows)
+
+    detach("package:plyr", unload = TRUE)
+
+    data <- data %>%
+
       janitor::clean_names() %>%
       rename(speed = extensions_tpx_speed, watts = extensions_tpx_watts) %>%
       mutate_at(2:5, as.numeric) %>%
@@ -115,8 +123,8 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
       wattbike_data <- rbind(wattbike_data, data)
     }
 
-    new_location <- paste0(end_folder, "/", files[i])
-    file.rename(from = file_locs[i], to = new_location)
+    #new_location <- paste0(end_folder, "/", files[i])
+    #file.rename(from = file_locs[i], to = new_location)
 
   }
 
@@ -149,6 +157,43 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
       entered_by_user_id = sb_user_id,
       #start_date = date
     )
+
+  wattbike_summary <- wattbike_data %>%
+    mutate(
+      about = tolower(dancer),
+      firstname = about,
+      about = gsub("_", " ", about)
+    ) %>%
+    separate(firstname, into = c("firstname", "surname")) %>%
+    left_join(weights, by = "about") %>%
+    rename(
+      #weight = 'Weight (kg)',
+      date_time = time,
+    ) %>%
+    mutate(
+      watts_kg = watts / weight,
+      test_time = test_duration_secs,
+      test_type = type,
+      test_pct = time_secs / test_time,
+    ) %>%
+    filter(!is.na(user_id)) %>%
+    group_by(dancer, date, user_id) %>%
+    summarise(
+      Exercise = "Bike",
+      'Weight (kg)' = weight[1],
+      'Distance (m)' = max(distance_meters, na.rm = T),
+      'Time (s)' = max(time_secs, na.rm = T),
+      'Max HR'  = max(heart_rate, na.rm = T),
+      'Average HR'  = mean(as.numeric(heart_rate), na.rm = T),
+
+    ) %>%
+    ungroup() %>%
+    neon::push_smartabase(
+      form = "MAS",
+      entered_by_user_id = sb_user_id,
+      #start_date = date
+    )
+
 
 }
 
