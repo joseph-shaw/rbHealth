@@ -123,8 +123,8 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
       wattbike_data <- rbind(wattbike_data, data)
     }
 
-    #new_location <- paste0(end_folder, "/", files[i])
-    #file.rename(from = file_locs[i], to = new_location)
+    new_location <- paste0(end_folder, "/", files[i])
+    file.rename(from = file_locs[i], to = new_location)
 
   }
 
