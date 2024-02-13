@@ -53,16 +53,19 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
 
   weights <- neon::pull_smartabase(
     form = "ForceDecks Trials",
-    start_date = "01/01/2022",
+    start_date = "01/06/2023",
     end_date = "01/01/3000"
   ) %>%
+    filter(
+      !is.na(`Weight (kg)`),
+      `Weight (kg)` > 35,
+    ) %>%
     mutate(
       date = as.Date(start_date, format = "%d/%m/%Y")
     ) %>%
     group_by(user_id) %>%
     rename(weight = `Weight (kg)`) %>%
     filter(
-      weight > 35,
       date == max(date),
       !is.na(weight)
     ) %>%
@@ -98,7 +101,7 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
         time = lubridate::as_datetime(time),
         time_secs = as.numeric(time - min(time)),
         dancer = names[i],
-        profiling = "Pre-season 2022-23",
+        profiling = "2023-24",
         date = as.Date(time),
         date = as.character(date),
         date = paste(sep = "/", formatC(lubridate::day(date), width = 2, flag = 0, format = "d"), formatC(lubridate::month(date), width = 2, flag = 0, format = "d"), lubridate::year(date)),
@@ -123,8 +126,8 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
       wattbike_data <- rbind(wattbike_data, data)
     }
 
-    new_location <- paste0(end_folder, "/", files[i])
-    file.rename(from = file_locs[i], to = new_location)
+    #new_location <- paste0(end_folder, "/", files[i])
+    #file.rename(from = file_locs[i], to = new_location)
 
   }
 
