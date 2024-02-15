@@ -126,8 +126,8 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
       wattbike_data <- rbind(wattbike_data, data)
     }
 
-    #new_location <- paste0(end_folder, "/", files[i])
-    #file.rename(from = file_locs[i], to = new_location)
+    new_location <- paste0(end_folder, "/", files[i])
+    file.rename(from = file_locs[i], to = new_location)
 
   }
 
@@ -188,7 +188,7 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
       'Time (s)' = max(time_secs, na.rm = T),
       'Max HR'  = max(heart_rate, na.rm = T),
       'Average HR'  = mean(as.numeric(heart_rate), na.rm = T),
-
+      'Average Power (W)'  = mean(as.numeric(watts), na.rm = T),
     ) %>%
     ungroup() %>%
     neon::push_smartabase(
