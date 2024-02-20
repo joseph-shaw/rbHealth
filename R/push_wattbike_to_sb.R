@@ -186,7 +186,7 @@ push_wattbike_to_sb <- function(user = Sys.info()[["user"]], start_folder = NA, 
       'Weight (kg)' = weight[1],
       'Distance (m)' = max(distance_meters, na.rm = T),
       'Time (s)' = max(time_secs, na.rm = T),
-      'Max HR'  = max(heart_rate, na.rm = T),
+      'Max HR'  = max(as.numeric(heart_rate), na.rm = T),
       'Average HR'  = mean(as.numeric(heart_rate), na.rm = T),
       'Average Power (W)'  = mean(as.numeric(watts), na.rm = T),
     ) %>%
